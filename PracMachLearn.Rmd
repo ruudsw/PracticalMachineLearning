@@ -1,0 +1,66 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Ruud SW"
+date: "April 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(randomForest)
+load("res.RData")
+
+```
+
+## Introduction
+There is a large amount of data available relating to personal activity due to the use of devices like Nike FuelBand and Fitbit. However, these devices only measure the amount of activity/exercise and not the way the activity is performed. What is rarely measured is how well an exercise is performed. In this report I analyze weightlifting data in order to classify the way an exercise was performed. The model used for this is a random forest model. The prediction performance of the model is also analyzed.
+
+
+## Data
+The data is the Weigtht Liftin Exercises Dataset (Velloso et. al, 2013) and it consists of 160 variables obtained from the accelerometers on the belt, forearm, arm and dumbell of 6 participants who repeatedly performed weightlifting exercises in 5 different ways. Class A corresponds to the correct way to perform an exercise. The other 4 classes correspond to common incorrect ways of performing the exercise. To prepare the data, the variables containing mostly blank spaces or NA values are not included in the dataset. Other variables that have no use for classification, like the time and date, are also not included in the dataset. This results in a dataset with 53 variables, one of these is the class of the exercise performed. In total, there are 19622 observations in the dataset. These correspond to the repetitions of various exercises performed by the 6 participants, so there are groups of observations that are very similar. This will likely help the classification model recognize the class of exercise better. To get an idea of the prediction performance, these observations are split into a training and a test set. 70% of the observations go into the training set for a total of 13737 observations and 30% of the observations (5885) make up the test set. The large number of observations allow for including all variables in the model. The Appendix gives a plot of the variable importance.
+
+```{r data}
+data.training = read.csv("pml-training.csv", na.strings=c("", "NA"))
+data.testing = read.csv("pml-testing.csv", na.strings=c("", "NA"))
+data.training <- data.training[, colSums(is.na(data.training)) == 0] 
+data.testing <- data.testing[, colSums(is.na(data.testing)) == 0] 
+data.training <- data.training[, -c(1:7)] 
+data.testing <- data.testing[, -c(1:7)] 
+
+set.seed(4042018)
+inTrain <- createDataPartition(y=data.training$classe, p = 0.7, list = FALSE)
+training <- data.training[inTrain,]
+testing  <- data.training[-inTrain,]
+```
+
+## Model and results
+There are several ways of approaching this classification problem. A classification technique such as Naive Bayes does not make the most sense as it assumes the covariates are independent. Since the data is from multiple accelerometers at the same time on for example the arms, this independence is obviously not the case. Linear Discriminant Analysis (LDA) assumes an identical covariance matrix which is an assumption that also not always holds. Two techniques that are of interest to consider are boosting and random forests, which are very accurate in general. Since some covariates might display the difference in the way the exercise is performed more clearly, it makes more sense to use random forest. The combination of bootstrapped samples and the bootstrapped variables result in a large set of trees that can give a very accurate prediction. Random forest models have a tendency to overfit the data, so a 10-fold cross-validation is applied. The model is trained using default parameters.
+
+```{r eval=FALSE}
+tc <- trainControl(method="cv")
+model.rf <- train(classe ~ ., data=training, method="rf", trControl=tc)
+model.rf
+```
+```{r eval=TRUE,echo=FALSE}
+model.rf
+```
+The final random forest model samples 27 variables randomly at each split and then determines on which variable to split; which variable reduces the node impurity the most. This is still a relatively large number of variables and this is also noticable in the computation time. The in-sample accuracy of the final model is 0.991. The out-of sample prediction accuracy of the model on the testing set is given in the confusion matrix.
+```{r eval=TRUE}
+confusionMatrix(testing$classe,predict(model.rf, newdata=testing))
+```
+The model is very precise with a prediction accuracy of 0.997. This is actually higher than the in-sample accuracy. This shows the model is not overfitted on the training set. The error rate can be expected to be around 3 in 1000 cases. Finally, the exercise class of 20 cases is also predicted, these are given below.
+```{r eval=TRUE,echo=FALSE}
+test <- predict(model.rf,data.testing)
+test
+```
+
+
+## Appendix
+```{r eval=TRUE,echo=FALSE}
+varImpPlot(forestTrain,type=2,main="Variable importance")
+```
+
+## References
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
